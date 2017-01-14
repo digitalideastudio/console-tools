@@ -1,0 +1,12 @@
+{
+    "directories": ["src"],
+    "chmod": "0777",
+    "finder": [{
+        "name": "*.php",
+        "exclude": ["Tests", "tests", "examples"],
+        "in": "vendor"
+    }],
+    "main": "bin/console",
+    "output": "tools.phar",
+    "stub": true
+}
