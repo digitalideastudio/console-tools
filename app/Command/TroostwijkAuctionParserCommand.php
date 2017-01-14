@@ -1,6 +1,7 @@
 <?php
 namespace App\Command;
 
+use App\Services\PDFCreator;
 use GuzzleHttp\Client;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Command\LockableTrait;
@@ -8,6 +9,7 @@ use Symfony\Component\Console\Helper\ProgressBar;
 use Symfony\Component\Console\Helper\Table;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DomCrawler\Crawler;
@@ -20,11 +22,22 @@ class TroostwijkAuctionParserCommand extends Command
     const API_URL = 'https://beta.troostwijkauctions.com/api/searchlot/lots?batchSize=%d&offset=%d&searchTerm=%s&type=lots';
     const LOT_URL = 'https://beta.troostwijkauctions.com/uk';
 
+    /** @var PDFCreator */
+    protected $pdf;
+
+    public function __construct($name = null)
+    {
+        parent::__construct($name);
+
+        $this->pdf = new PDFCreator();
+    }
+
     protected function configure()
     {
         $this->setName('tool:show-troostwijk-auctions')
              ->setDescription('Parses and displays a list of Troostwijk Auctions')
-             ->addArgument('term', InputArgument::REQUIRED, 'Search term');
+             ->addArgument('term', InputArgument::REQUIRED, 'Search term')
+             ->addOption('pdf', 'E', InputOption::VALUE_NONE, 'Export to PDF');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
@@ -39,17 +52,19 @@ class TroostwijkAuctionParserCommand extends Command
 
         $count = count($results);
 
-        if ( ! $count) {
-            $io->caution('Nothing found.');
-        }
-
         $output->writeln(sprintf('%s results found.', $count));
+
+        if ( ! $count) {
+            $io->text('Nothing to display.');
+            exit(0);
+        }
 
         $progressBar = new ProgressBar($output, $count);
         $progressBar->setBarCharacter('<fg=magenta>=</>');
         $progressBar->setProgressCharacter("\xF0\x9F\x8D\xBA");
 
         $rows = [];
+        $headers = ['Lot title', 'Bids', 'Current', 'Start', 'Closes', 'Link'];
 
         foreach ($results as $result) {
             $url = self::LOT_URL . $result->url;
@@ -89,11 +104,17 @@ class TroostwijkAuctionParserCommand extends Command
         }
 
         $progressBar->finish();
+        $io->newLine();
+
+        if ($input->getOption('pdf')) {
+            $this->pdf->setTitle('Auction result for "' . $term . '"');
+            $this->pdf->setTable($headers, $rows);
+            $this->pdf->save(getcwd() . '/result.pdf');
+        }
+
         $table = new Table($output);
 
-        $table->setHeaders(
-            ['Lot title', 'Bids', 'Current', 'Start', 'Closes', 'Link']
-        );
+        $table->setHeaders($headers);
         $table->setColumnWidths([7, 3, 3, 3, 5, 5, 10]);
 
         $table->setRows($rows);
