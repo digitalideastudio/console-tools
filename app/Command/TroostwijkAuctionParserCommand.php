@@ -16,59 +16,63 @@ class TroostwijkAuctionParserCommand extends Command
 {
     use LockableTrait;
 
+    const BATCH_SIZE = 1000;
+    const API_URL = 'https://beta.troostwijkauctions.com/api/searchlot/lots?batchSize=%d&offset=%d&searchTerm=%s&type=lots';
+    const LOT_URL = 'https://beta.troostwijkauctions.com/uk';
+
     protected function configure()
     {
         $this->setName('tool:show-troostwijk-auctions')
-            ->setDescription('Parses and displays a list of Troostwijk Auctions')
-            ->addArgument('file', InputArgument::REQUIRED, 'Path to file with links to the lots.')
-        ;
+             ->setDescription('Parses and displays a list of Troostwijk Auctions')
+             ->addArgument('term', InputArgument::REQUIRED, 'Search term');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $file = $input->getArgument('file');
-        $io = new SymfonyStyle($input, $output);
+        $term = $input->getArgument('term');
+        $io   = new SymfonyStyle($input, $output);
         $io->title('Troostwijk Auctions parser');
 
-        if (!is_readable($file)) {
-            $io->error(sprintf('%s', 'This file is not exists or not readable.'));
+        $output->write('Retrieving results... ');
+        $results = $this->getLotsByTerm($term);
+        $results = $results->results;
+
+        $count = count($results);
+
+        if ( ! $count) {
+            $io->caution('Nothing found.');
         }
 
-        $output->write('Loading links... ');
-        $links = array_filter(explode(PHP_EOL, file_get_contents($file)));
-        $count = count($links);
-
-        if (!$links) {
-            $io->error('No links available!');
-        }
-
-        $output->writeln(sprintf('%s links loaded.', $count));
+        $output->writeln(sprintf('%s results found.', $count));
 
         $progressBar = new ProgressBar($output, $count);
         $progressBar->setBarCharacter('<fg=magenta>=</>');
         $progressBar->setProgressCharacter("\xF0\x9F\x8D\xBA");
 
         $rows = [];
-        $client = new Client();
 
-        for($i = 0; $i < $count; $i++) {
-            $url = $links[$i];
+        foreach ($results as $result) {
+            $url = self::LOT_URL . $result->url;
 
-            $res = $client->request('GET', $url);
-            $html = $res->getBody()->getContents();
+            if ($io->isVerbose()) {
+                $io->text('Processing URL ' . $url);
+            }
 
-            $crawler = new Crawler($html);
-            $h1 = $crawler->filterXPath('//*[@id="app"]/div/div[2]/div[2]/div[1]/div/h1');
+            $html = $this->getUrlContents($url);
+
+            $crawler    = new Crawler($html);
+            $h1         = $crawler->filterXPath('//*[@id="app"]/div/div[2]/div[2]/div[1]/div/h1');
             $bids_count = $crawler->filterXPath('//*[@id="app"]/div/div[2]/div[2]/div[2]/div[3]/div[3]/div[1]/div/span');
-            $cur_bid = $crawler->filterXPath('//*[@id="app"]/div/div[2]/div[2]/div[2]/div[3]/div[3]/div[2]/div[1]/span');
-            $start_bid = $crawler->filterXPath('//*[@id="app"]/div/div[2]/div[2]/div[2]/div[3]/div[3]/div[2]/div[2]/span');
+            $cur_bid    = $crawler->filterXPath('//*[@id="app"]/div/div[2]/div[2]/div[2]/div[3]/div[3]/div[2]/div[1]/span');
+            $start_bid  = $crawler->filterXPath('//*[@id="app"]/div/div[2]/div[2]/div[2]/div[3]/div[3]/div[2]/div[2]/span');
             // $desc = $crawler->filterXPath('//*[@id="description"]');
             $close = $crawler->filterXPath('//*[@id="app"]/div/div[2]/div[2]/div[2]/div[3]/div[1]/div/span[2]/span');
 
-            $bids_count = intval(trim($bids_count->text()));
+            $bids_count = $bids_count->count() ? intval(trim($bids_count->text())) : 0;
 
-            if ($bids_count >= 10) {
-//                $bids_count .= " \xF0\x9F\x8C\xB6 ";
+            if (!$bids_count) {
+                $bids_count = "  - ";
+            } elseif ($bids_count >= 10) {
                 $bids_count .= " \xF0\x9F\x94\xA5 ";
             }
 
@@ -96,5 +100,28 @@ class TroostwijkAuctionParserCommand extends Command
         $table->render();
 
         $io->success('Parsing Finished!');
+    }
+
+    private function getLotsByTerm($term): \stdClass
+    {
+        $url = $this->buildURL($term);
+
+        return \GuzzleHttp\json_decode($this->getUrlContents($url));
+    }
+
+    private function buildURL(string $term, int $offset = 0, int $batchSize = self::BATCH_SIZE): string
+    {
+        return sprintf(self::API_URL,
+            $batchSize,
+            $offset,
+            $term
+        );
+    }
+
+    private function getUrlContents(string $url): string
+    {
+        $client = new Client();
+
+        return $client->get($url)->getBody()->getContents();
     }
 }
