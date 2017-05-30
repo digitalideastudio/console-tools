@@ -11,8 +11,15 @@ class PDFCreator
     public function __construct()
     {
         $this->pdf = new \TCPDF(PDF_PAGE_ORIENTATION, PDF_UNIT, PDF_PAGE_FORMAT, true, 'UTF-8', false);
-        $this->pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
-        $this->pdf->SetFontSize('10px');
+        // set default font subsetting mode
+        $this->pdf->setFontSubsetting(true);
+        
+        // Default font
+        // $this->pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
+        // $this->pdf->SetFontSize('10px');
+
+        // Fallback font
+        $this->pdf->SetFont('freeserif', '', 12);
 
         // set margins
         $this->pdf->SetMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
@@ -23,6 +30,12 @@ class PDFCreator
         $this->pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
 
         $this->column_widths = [200, 40, 80, 80, 80];
+
+        return $this;
+    }
+
+    public function setColumnWidths(array $array) : self {
+        $this->column_widths = $array;
 
         return $this;
     }
@@ -41,7 +54,6 @@ class PDFCreator
 
         $idx = 0;
         $widths = $this->column_widths;
-        unset($headers[count($headers) - 1]);
 
         $html .= '<tr>' . implode('', array_map(function ($item) use (&$idx, $widths) {
                 $style = ' style="background: #e8e8e8;width:' . $widths[$idx++] . 'px;" ';
@@ -50,10 +62,6 @@ class PDFCreator
             }, $headers)) . '</tr>';
 
         foreach ($table as $rows) {
-            $last_col = $rows[count($rows) - 1];
-            $rows[0] = '<a href="' . $last_col . '">' . $rows[0] . '</a>';
-            unset($rows[count($rows) - 1]);
-
             $html .= '<tr>' . implode('', array_map(function ($item) {
                 return '<td>' . $item . '</td>';
             }, $rows)) . '</tr>';
@@ -68,7 +76,7 @@ class PDFCreator
     public function save(string $file)
     {
         // add a page
-        $this->pdf->AddPage();
+        $this->pdf->AddPage('L');
         $this->pdf->writeHTMLCell(0, 0, '', '', '<h2>' . $this->title . '</h2>');
         $this->pdf->writeHTML('<br/><br/>');
         $this->pdf->writeHTML($this->content);

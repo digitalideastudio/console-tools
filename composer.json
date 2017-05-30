@@ -5,7 +5,8 @@
         "symfony/http-foundation": "^3.2",
         "symfony/dom-crawler": "^3.2",
         "guzzlehttp/guzzle": "~6.0",
-        "tecnickcom/tcpdf": "^6.2"
+        "tecnickcom/tcpdf": "^6.2",
+        "symfony/css-selector": "^3.3"
     },
     "autoload": {
         "psr-4": {
