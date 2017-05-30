@@ -13,4 +13,4 @@ This can also generate a PDF file:
 
 Result
 
-![Sample](./docs/tools.gif)
+![Sample](./doc/tools.gif)
