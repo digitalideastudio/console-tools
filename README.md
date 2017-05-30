@@ -13,4 +13,18 @@ This can also generate a PDF file:
 
 Result
 
-![Sample](./doc/tools.gif)
+![Sample](./doc/auction.gif)
+
+
+#### Show [Opera.Com.Ua] (http://opera.com.ua) event feed
+
+Commands:
+`tools.phar tool:opera-com-ua-afisha`
+
+This can also generate a PDF file:
+
+`tools.phar tool:opera-com-ua-afisha --pdf`
+
+Result
+
+![Sample](./doc/opera.com.ua.gif)
